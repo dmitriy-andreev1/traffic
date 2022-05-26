@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+            .text {color: white;}
+            .abs {position: absolute;}
+
+            #controls {width: 200px;}
+
+            /* #pause-button {position: absolute;} */
+            #canvas {position: absolute;}
+		</style>
+	</head>
+	<body>
+        <div id="canvas"></div>
+        <div class="abs" id="controls">
+            <div>
+                <button id="pause-button" >Pause</button>
+            </div>
+
+            <hr/>
+
+            <div>
+                <span class="text">Phase 1</span><input id="phase1time" type="number" value="10">
+                <span class="text">Phase 2</span><input id="phase2time" type="number" value="10">
+                <span class="text">Traffic</span><input id="traffics" type="number" value="0">
+                <span class="text">Y-cord</span><input id="ycord" type="number" value="50">
+                <span class="text">Stripes</span><input id="stripe" type="number" value="2">
+                <button id="addRoad" >ADD ROAD</button>
+            </div>
+
+            <hr/>
+
+            <div id="trafficLisghts">
+            </div>
+        </div>>
+
+
+		<script src="./three.js"></script>
+        <!-- <script src="https://cdn.jsdelivr.net/npm/three@0.115/build/three.js"></script> -->
+        <script src="https://cdn.jsdelivr.net/npm/three@0.115/examples/js/controls/DragControls.js"></script>
+        <script src="./DragControls.js"></script>
+        <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+		<script>
+            //
+			const scene = new THREE.Scene();
+
+            var clock = new THREE.Clock();
+            const minspawndelay = 2;
+            const maxspawndelay = 5;
+            var lastspawn = 0;
+            const amountStrip = 4;
+            const barrierOpacity = 0.2
+
+            var paused = false
+
+
+
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirlight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirlight.position.set (100, -300, 400);
+            scene.add(dirlight);
+
+            const aspectRatio = window.innerWidth / window.innerHeight;
+            const cameraWidth = 150;
+            const cameraHeight = cameraWidth / aspectRatio;
+
+            const camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 500 );
+            camera.position.set( 0, 0, 400);
+            camera.lookAt( 0, 0, 0 );
+
+            const renderer = new THREE.WebGLRenderer({antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.render(scene, camera);
+
+
+
+            traficLights = new THREE.Group()
+
+
+            function getRoad(x, y, rotation, amountStrip, amountTraficLights, intensity, lengthRoad, amountCrossRoad){
+
+                var groupRoad = new THREE.Group()
+                groupRoad.x = x
+                groupRoad.y = y
+                groupRoad._rotation = rotation
+                groupRoad.amountStrip = amountStrip
+                groupRoad.amountTraficLights = amountTraficLights
+                groupRoad.lengthRoad = lengthRoad
+
+                if (rotation == 1){
+                    groupRoad.rotation.z = Math.PI/2
+                }
+                else{
+
+                }
+                const amountMarking = lengthRoad / 1.5;
+
+                const geom = new THREE.BoxGeometry(20 * amountStrip, lengthRoad)
+
+
+                var material1 = new THREE.MeshBasicMaterial({color: "#666666"} );
+
+                const main = new THREE.Mesh(geom, material1);
+
+
+
+                const geom6 = new THREE.BoxGeometry(1, lengthRoad)
+
+                var material6 = new THREE.MeshBasicMaterial({color: "#FFFFFF"});
+
+                const lineMarking = new THREE.Mesh(geom6, material6);
+
+                groupRoad.add(lineMarking)
+                groupRoad.add(main)
+                const geo = new THREE.BoxGeometry(1,3,1)
+
+                var material = new THREE.MeshBasicMaterial( { color: '#F5F5F5' } );
+
+                var k = 1;
+                var h = 1;
+
+                while (h <= (amountStrip - 1) * 2 + 1)  {
+
+                    while (k < amountMarking){
+                        const cube = new THREE.Mesh( geo, material );
+                        cube.position.set(-10 * amountStrip + 10 * h, lengthRoad / 2 - 1.5 * k - 5)
+
+                        groupRoad.add(cube)
+                        k += 8;
+
+                    }
+                    h += 1;
+                    k = 1;
+
+
+                }
+
+                var p = 0
+                while (p < amountTraficLights){
+                    if (rotation == 0){
+                        var geom3 = new THREE.BoxGeometry(20 * amountStrip, 1, 3);
+                        var material3 = new THREE.MeshBasicMaterial({color: "#0000FA"});
+                        material3.opacity = barrierOpacity
+                        material3.transparent = true
+                        var barrier = new THREE.Mesh(geom3, material3);
+                        barrier.position.set(x, y);
+
+
+                        var geom4 = new THREE.CircleGeometry(2, 30);
+                        var material4 = new THREE.MeshBasicMaterial({color: "#FF0000"});
+                        var red1 = new THREE.Mesh(geom4, material4);
+                        red1.position.set(10 * amountStrip + 3, y );
+
+                        var geom5 = new THREE.CircleGeometry(2, 30);
+                        var material5 = new THREE.MeshBasicMaterial({color: "#00FF00"});
+                        var green1 = new THREE.Mesh(geom5, material5);
+                        green1.position.set(10 * amountStrip + 8, y);
+                        var groupTrafficLight = new THREE.Group()
+                        groupTrafficLight.add(red1, green1, barrier)
+                        traficLights.add(groupTrafficLight)
+                        groupTrafficLight.position.set(0, 5 * p)
+                        groupTrafficLight.state = "red";
+
+
+                        groupTrafficLight.redTime = 10;
+                        groupTrafficLight.greenTime = 10;
+
+                        groupTrafficLight.currentTime = 0;
+                        groupTrafficLight.position.set(x, amountStrip*20 + y + 10 * p)
+
+                        p += 1
+                    }
+                    if (rotation == 1){
+                        var geom3 = new THREE.BoxGeometry(1,20 * amountStrip , 3);
+                        var material3 = new THREE.MeshBasicMaterial({color: "#0000FA"});
+                        material3.opacity = barrierOpacity
+                        material3.transparent = true
+                        var barrier = new THREE.Mesh(geom3, material3);
+                        barrier.position.set(0, 0);
+
+                        var geom4 = new THREE.CircleGeometry(2, 30);
+                        var material4 = new THREE.MeshBasicMaterial({color: "#FF0000"});
+                        var red1 = new THREE.Mesh(geom4, material4);
+                        red1.position.set(x, 10 * amountStrip + 3 );
+
+                        var geom5 = new THREE.CircleGeometry(2, 30);
+                        var material5 = new THREE.MeshBasicMaterial({color: "#00FF00"});
+                        var green1 = new THREE.Mesh(geom5, material5);
+                        green1.position.set(x, 10 * amountStrip + 8);
+
+                        var groupTrafficLight = new THREE.Group()
+                        groupTrafficLight.add(red1, green1, barrier)
+                        traficLights.add(groupTrafficLight)
+
+                        groupTrafficLight.state = "red";
+
+
+                        groupTrafficLight.redTime = 10;
+                        groupTrafficLight.greenTime = 10;
+
+                        groupTrafficLight.currentTime = 0;
+                        groupTrafficLight.position.set(50 + x + 30 * p + amountStrip * 20, y)
+                        p += 1
+
+                    }
+                }
+
+                groupRoad.position.set(x, y)
+
+                return groupRoad
+
+            }
+            var groupRoads = new THREE.Group()
+
+
+            var groupRoad = getRoad(0, 0, 0, 4, 1, 10, 300)
+            // var groupRoad1 = getRoad(0, 0, 1, 2, 0, 10, 300)
+
+
+            groupRoads.add(groupRoad)
+
+
+            scene.add(groupRoads)
+            scene.add(traficLights)
+
+
+
+
+
+
+            function getTraficLight(x, y, redTime, greenTime, state, direction, stripes){
+
+
+                var geom3 = new THREE.BoxGeometry(20 * stripes, 1, 3);
+                var material3 = new THREE.MeshBasicMaterial({color: "#0000FA"});
+                material3.opacity = barrierOpacity
+                material3.transparent = true
+                var barrier = new THREE.Mesh(geom3, material3);
+                barrier.position.set(0, 0);
+
+                var geom4 = new THREE.CircleGeometry(2, 30);
+                var material4 = new THREE.MeshBasicMaterial({color: "#FF0000"});
+                var red1 = new THREE.Mesh(geom4, material4);
+                red1.position.set( (20 * stripes)/2 + 3, 0 );
+
+                var geom5 = new THREE.CircleGeometry(2, 30);
+                var material5 = new THREE.MeshBasicMaterial({color: "#00FF00"});
+                var green1 = new THREE.Mesh(geom5, material5);
+                green1.position.set((20 * stripes)/2+ 8, 0);
+                var groupTrafficLight1 = new THREE.Group()
+                groupTrafficLight1.add(red1, green1, barrier)
+                groupTrafficLight1.position.set(x, y)
+                console.log(groupTrafficLight1.position)
+
+                groupTrafficLight1.state = state;
+                groupTrafficLight1.direction = direction
+                groupTrafficLight1.redTime = redTime
+                groupTrafficLight1.greenTime = greenTime
+                groupTrafficLight1.currentTime = 0
+
+                return groupTrafficLight1
+
+            }
+
+
+
+            function getCrossGroup(x, y, phaseTime1, phaseTime2, stripes, stripes2){
+                crossGroup = new THREE.Group()
+
+                crossGroup.x = x
+                crossGroup.y = y
+                console.log(stripes, stripes2)
+                var strip = scene.children[2].children[0].amountStrip
+
+
+                var lowLight = getTraficLight(0,0,phaseTime1, phaseTime2, 'red', 'up', strip)
+
+                var highLight = getTraficLight(0,0,phaseTime1, phaseTime2, 'red', 'bottom', strip)
+                highLight.rotation.z = Math.PI
+                var leftLight = getTraficLight(0, 0, phaseTime2, phaseTime1, 'green', 'right', stripes2)
+                leftLight.rotation.z = -Math.PI/ 2
+                var rightLight = getTraficLight(0, 0, phaseTime2, phaseTime1, 'green', 'left', stripes2)
+                rightLight.rotation.z = Math.PI/ 2
+
+                crossGroup.add(lowLight, highLight, leftLight, rightLight)
+                crossGroup.position.set(x, y)
+                lowLight.position.set(0, -10 * stripes2)
+                highLight.position.set(0, 10*stripes2)
+                leftLight.position.set(-10*strip, 0)
+                rightLight.position.set(10 * strip, 0)
+
+                return crossGroup
+            }
+            crossLights = new THREE.Group()
+
+
+
+
+
+
+
+
+
+
+            function getCar(x, y, direction, strip){
+                const geom1 = new THREE.BoxGeometry(5,8,2)
+                var material2 =  new THREE.MeshBasicMaterial({color: "#FFAA33"});
+                const car = new THREE.Group();
+
+
+                const carbody = new THREE.Mesh(geom1, material2);
+                car.direction = direction
+                car.state = "normal"
+
+                //console.log(car.direction)
+
+
+                const geom7 = new THREE.BoxGeometry(5, 4, 2)
+                const material7 = new THREE.MeshBasicMaterial({color: "#666666"})
+
+                material7.opacity = 0.0
+                material7.transparent = true
+
+                const forward = new THREE.Mesh(geom7, material7)
+                const backward = new THREE.Mesh(geom7, material7)
+
+
+                car.forwardBox = forward
+                car.backwardBox = backward
+
+
+
+                if (direction == "bottom") {
+                    car.position.set(5 - 10 * strip, y)
+                    carbody.position.set(0, 0)
+                    forward.position.set(0, -5)
+                    backward.position.set(0, 5)
+                    car.add(carbody, forward, backward)
+
+                }
+                if (direction == 'up') {
+                    car.position.set(-5 + 10 * strip, y)
+                    carbody.position.set(0, 0)
+                    forward.position.set(0, 5)
+                    backward.position.set(0, -5)
+                    car.add(carbody, forward, backward)
+
+                }
+                if (direction == 'left'){
+                    car.position.set(x, -5 + 10 * strip + y)
+                    carbody.position.set(0, 0)
+                    forward.position.set(0, 5)
+                    backward.position.set(0, -5)
+                    car.add(carbody, forward, backward)
+                    car.rotation.z = Math.PI/2
+
+
+                }
+                if (direction == 'right'){
+                    car.position.set(x, 5 - 10 * strip + y)
+                    carbody.position.set(0, 0)
+                    forward.position.set(0, -5)
+                    backward.position.set(0, 5)
+                    car.add(carbody, forward, backward)
+                    car.rotation.z = Math.PI/2
+
+                }
+
+
+                return car
+
+
+            }
+
+
+            groupCar = new THREE.Group();
+
+
+
+            function realcarspawn(groupRoad){
+                var direction
+                var strip
+                var y
+                var x
+
+
+                if (groupRoad._rotation == 1){
+                    console.log(groupRoad.position.y, '11111')
+                    strip = Math.round(Math.random() * groupRoad.amountStrip)
+                    if (strip == 0){
+                        strip = 1
+                    }
+                    if (Math.random() < 0.5){
+                        direction = 'left';
+                        x = groupRoad.lengthRoad / 2 - 15
+                        y = groupRoad.position.y
+
+                    }
+                    else{
+                        direction = 'right';
+                        x = -groupRoad.lengthRoad / 2 - 15
+                        y = groupRoad.position.y
+
+                    }
+                    carx = getCar(x, y, direction, strip)
+                    groupCar.add(carx)
+                    lastspawn = 0;
+                    }
+
+                else{
+                    strip = Math.round(Math.random() * groupRoad.amountStrip)
+                    if (strip == 0){
+                        strip = 1
+                    }
+                    if (Math.random() < 0.5){
+                        direction = 'bottom';
+                        y = groupRoad.lengthRoad / 2 - 15
+
+                    }
+
+                    else{
+                        direction = 'up';
+                        y = -groupRoad.lengthRoad / 2 - 15
+
+                    }
+                    car = getCar(x, y, direction, strip);
+
+                    groupCar.add(car);
+
+                    lastspawn = 0;
+
+                }
+
+            }
+
+            function spawnCar(delta){
+                lastspawn += delta
+                var groupRoad
+                var randomi
+                randomi = Math.round(Math.random()*(groupRoads.children.length - 1))
+
+
+                groupRoad = groupRoads.children[randomi]
+
+
+
+                if (lastspawn >= minspawndelay){
+                    if (Math.random() > 0.1){
+                        realcarspawn(groupRoad)
+                        return
+
+
+                    }
+                }
+
+                if (lastspawn >= maxspawndelay){
+                    realcarspawn(groupRoad)
+                    return
+                }
+
+
+            }
+
+
+
+
+            const car1 = getCar(50, -75, 'left', 1);
+            const car2 = getCar(-100, -100, 'up', 1);
+            const car3 = getCar(0, 40, 'right', 2);
+            const car4 = getCar(100, -50, 'bottom', 2);
+
+            groupCar.add(car1);
+            groupCar.add(car2);
+            groupCar.add(car3);
+           groupCar.add(car4);
+
+
+
+            scene.add(groupCar);
+            scene.add(crossLights)
+
+
+
+
+
+            function animate() {
+
+				requestAnimationFrame( animate );
+
+
+                if (paused) {
+                    return
+                }
+
+                var forRemove = [];
+                var delta = clock.getDelta()
+                var carVelocity = 60
+
+
+
+
+                for (i in groupCar.children) {
+
+
+                    if (groupCar.children[i].state != "normal") {
+                        // console.log(groupCar.children[i].state)
+                        continue
+                    }
+                    // console.log()
+
+                    var offset = carVelocity * delta
+                    if (offset < 0.5){
+                        offset = 0.5
+                    }
+
+                    if (groupCar.children[i].direction == 'bottom'){
+                        groupCar.children[i].position.y -= offset
+                    }
+                    if (groupCar.children[i].direction == 'up'){
+                        groupCar.children[i].position.y += offset
+
+                    }
+                    if (groupCar.children[i].direction == 'left'){
+                        groupCar.children[i].position.x -= offset
+
+                    }
+                    if (groupCar.children[i].direction == 'right'){
+                        groupCar.children[i].position.x += offset
+
+                    }
+                    // console.log(groupCar.children[i].position.y)
+
+                    if (groupCar.children[i].position.y > 300/2 + 10 ){
+
+                        forRemove.push(groupCar.children[i]);
+
+                    }
+                    if (groupCar.children[i].position.x < -300/2 - 15 ){
+                        forRemove.push(groupCar.children[i]);
+                    }
+                    if (groupCar.children[i].position.x > 300/2 + 15 ){
+                        forRemove.push(groupCar.children[i]);
+                    }
+
+                    if (groupCar.children[i].position.y < -300/2 - 15 ){
+                        forRemove.push(groupCar.children[i]);
+                    }
+
+
+                }
+                for (l in forRemove){
+                    forRemove[l].removeFromParent()
+
+
+
+                }
+                for (i in groupCar.children){
+                    groupCar.children[i].state = 'normal'
+                }
+                physics();
+
+                traffic(delta);
+
+                spawnCar(delta);
+
+
+
+
+
+				renderer.render( scene, camera );
+			};
+
+            function traffic(delta){
+                // console.log(crossLights.children[0].phaseTime1)
+                for (k in crossLights.children){
+
+                    for (i in crossLights.children[k].children){
+                        var trafic = crossLights.children[k].children[i]
+                        crossLights.children[k].children[i].currentTime += delta;
+
+                        // console.log(traficLights.children[k].currentTime , traficLights.children[k].greenTime)
+                        if (crossLights.children[k].children[i].currentTime >= crossLights.children[k].children[i].greenTime && crossLights.children[k].children[i].state == 'green')
+                        {
+                            crossLights.children[k].children[i].state = "red"
+                            crossLights.children[k].children[i].currentTime = 0
+                            // console.log(1)
+                        }
+
+                        if (crossLights.children[k].children[i].currentTime >= crossLights.children[k].children[i].redTime && crossLights.children[k].children[i].state == 'red')
+                        {
+                            crossLights.children[k].children[i].state = "green"
+                            crossLights.children[k].children[i].currentTime = 0
+                            // console.log(2)
+
+
+                        }
+
+
+                        // console.log(traficLights.children[k].state)
+                        if (crossLights.children[k].children[i].state == "green"){
+
+
+                            crossLights.children[k].children[i].children[0].material.color.setHex(0x794A55)
+                            crossLights.children[k].children[i].children[1].material.color.setHex(0x00FF00)
+                        }
+                        else{
+                            crossLights.children[k].children[i].children[1].material.color.setHex(0x294029)
+                            crossLights.children[k].children[i].children[0].material.color.setHex(0xFF0000)
+
+                        }
+
+
+
+                    }
+                }
+
+                for (k in traficLights.children){
+                    traficLights.children[k].currentTime += delta;
+
+                    // console.log(traficLights.children[k].currentTime , traficLights.children[k].greenTime)
+                    if (traficLights.children[k].currentTime >= traficLights.children[k].greenTime && traficLights.children[k].state == 'green')
+                    {
+                        traficLights.children[k].state = "red"
+                        traficLights.children[k].currentTime = 0
+                        // console.log(1)
+                    }
+
+                    if (traficLights.children[k].currentTime >= traficLights.children[k].redTime && traficLights.children[k].state == 'red')
+                    {
+                        traficLights.children[k].state = "green"
+                        traficLights.children[k].currentTime = 0
+                        // console.log(2)
+
+
+                    }
+
+
+                    // console.log(traficLights.children[k].state)
+                    if (traficLights.children[k].state == "green"){
+
+
+                        traficLights.children[k].children[0].material.color.setHex(0x794A55)
+                        traficLights.children[k].children[1].material.color.setHex(0x00FF00)
+                    }
+                    else{
+                        traficLights.children[k].children[1].material.color.setHex(0x294029)
+                        traficLights.children[k].children[0].material.color.setHex(0xFF0000)
+
+                    }
+
+
+
+
+
+                }
+
+
+
+
+            }
+            function physics(){
+
+                for (l in crossLights.children){
+                    for (g in crossLights.children[l].children){
+                        var trafic = crossLights.children[l].children[g]
+                        const a = new THREE.Box3().setFromObject(crossLights.children[l].children[g]);
+                        for (i in groupCar.children){
+                            const b = new THREE.Box3().setFromObject(groupCar.children[i].forwardBox);
+                            // console.log(crossLights.children[l].children[g].direction, groupCar.children[l].direction)
+
+                            if (a.intersectsBox(b) && trafic.state == 'red' && (trafic.direction == groupCar.children[i].direction)) {
+                                groupCar.children[i].state = 'trafficBlocked'
+                                groupCar.children[i].blockedTraffic = trafic
+                            }
+                            else {
+                            // groupCar.children[i].state = 'normal'
+
+                            }
+
+                            for (h in groupCar.children){
+                                const c = new THREE.Box3().setFromObject(groupCar.children[h].backwardBox);
+                                if (b.intersectsBox(c) && groupCar.children[i].id != groupCar.children[h].id){
+
+
+                                    // if (groupCar.children[h].state != 'trafficBlocked'){
+                                    //     groupCar.children[h].state = 'carBlocked'
+                                    // }
+
+                                    if (groupCar.children[i].state != 'trafficBlocked'){
+                                        groupCar.children[i].state = 'carBlocked'
+
+                                    }
+
+
+
+
+
+
+
+                                }
+                                else {
+                                    //groupCar.children[h].state = 'normal'
+                                    //groupCar.children[i].state = 'normal'
+
+                                }
+
+                            }
+                        }
+
+                    }
+
+
+
+                }
+
+                for (l in traficLights.children){
+
+
+                    const a = new THREE.Box3().setFromObject(traficLights.children[l]);
+                    for (i in groupCar.children){
+                        const b = new THREE.Box3().setFromObject(groupCar.children[i].forwardBox);
+                        // console.log(traficLights.children[l].direction, groupCar.children[l].direction)
+
+                        if (a.intersectsBox(b) && traficLights.children[l].state == 'red') {
+                            groupCar.children[i].state = 'trafficBlocked'
+                        }
+                        else {
+                        // groupCar.children[i].state = 'normal'
+
+                        }
+
+                        for (h in groupCar.children){
+                            const c = new THREE.Box3().setFromObject(groupCar.children[h].backwardBox);
+                            if (b.intersectsBox(c) && groupCar.children[i].id != groupCar.children[h].id){
+
+
+                                // if (groupCar.children[h].state != 'trafficBlocked'){
+                                //     groupCar.children[h].state = 'carBlocked'
+                                // }
+
+                                if (groupCar.children[i].state != 'trafficBlocked'){
+                                    groupCar.children[i].state = 'carBlocked'
+
+                                }
+
+
+
+
+
+
+
+                            }
+                            else {
+                                //groupCar.children[h].state = 'normal'
+                                //groupCar.children[i].state = 'normal'
+
+                            }
+
+                        }
+                    }
+
+
+
+
+
+
+                }
+
+            }
+
+
+            animate();
+
+            const controls = new THREE.DragControls( traficLights.children, camera, renderer.domElement );
+
+
+
+
+
+            controls.addEventListener( 'drag', function ( event ) {
+                event.object.parent.position.set(event.object.position.x, event.object.position.y )
+                event.object.position.set(0,0)
+                // event.object.material.emissive.set( 0xaaaaaa );
+
+            } );
+
+            controls.addEventListener( 'dragend', function ( event ) {
+
+                // event.object.material.emissive.set( 0x000000 );
+
+            } );
+            const materialCross = new THREE.MeshBasicMaterial({color: '#666666'})
+
+            document.addEventListener( 'mousedown',function(e){
+                return
+                console.log(e, (window.innerHeight/2 - e.clientY)/3.5)
+                var groupRoad1 = getRoad(0, (window.innerHeight/2 - e.clientY)/3.5 , 1, 2, 3, 10, 300)
+                var geomCross = new THREE.BoxGeometry(80, 20*groupRoad1.amountStrip, 2)
+                var dopMark = new THREE.Mesh(geomCross, materialCross)
+                dopMark.position.set(0, groupRoad1.position.y)
+                scene.add(dopMark)
+                groupRoads.add(groupRoad1)
+                g1 = getCrossGroup(0, (window.innerHeight/2 - e.clientY)/3.5, 5, 8, scene.children[2].children[0].amountStrip, 2)
+                g1.position.z = 2
+                crossLights.add(g1)
+
+
+
+            }, true );
+
+            document.getElementById("canvas").appendChild( renderer.domElement );
+
+            document.getElementById("pause-button").onclick = function(event) {
+                if (paused) {
+                    paused = false
+                    clock.start()
+                }else {
+                    paused = true
+                    clock.stop()
+                }
+
+            }
+
+            document.getElementById("addRoad").onclick = function(e) {
+                var phase1time = parseInt(document.getElementById("phase1time").value)
+                var phase2time = parseInt(document.getElementById("phase2time").value)
+                var traffics = parseInt(document.getElementById("traffics").value)
+                var ycord = parseInt(document.getElementById("ycord").value)
+                var stripe = parseInt(document.getElementById("stripe").value)
+
+                console.log(ycord, 0)
+                // ycord = -17
+
+                var groupRoad1 = getRoad(0, ycord, 1, stripe, traffics , 10, 300)
+                var geomCross = new THREE.BoxGeometry(80, 20*groupRoad1.amountStrip, 2)
+                var dopMark = new THREE.Mesh(geomCross, materialCross)
+                dopMark.position.set(0, groupRoad1.position.y)
+                scene.add(dopMark)
+                groupRoads.add(groupRoad1)
+                g1 = getCrossGroup(0, ycord, phase1time, phase2time, scene.children[2].children[0].amountStrip, stripe)
+                g1.position.z = 2
+                crossLights.add(g1)
+
+                var tl = document.getElementById("trafficLisghts")
+
+                var div = document.createElement('span');
+                div.classList.add("abs")
+
+                var label = document.createElement('span');
+                label.innerHTML = g1.id;
+                label.classList.add("text")
+
+                var currentRedTime = document.createElement('span');
+                currentRedTime.innerHTML = " " + phase1time + " ";
+                currentRedTime.classList.add("text")
+
+                currentRedTime.addEventListener('click', function(e) {
+                    this.innerHTML = " " + (parseInt(this.innerHTML) + 1)
+                    var trafficLight = null
+                    for (var i in crossLights.children) {
+                        console.log(parseInt(label.innerHTML), crossLights.children[i].id)
+                        if (parseInt(label.innerHTML) == crossLights.children[i].id) {
+                            trafficLight = crossLights.children[i]
+                            crossLights.children[i].phaseTime1 += 1
+
+                        }
+                    }
+                    // ЭТО нужный светофор
+                    console.log(trafficLight)
+                })
+                currentRedTime.addEventListener('contextmenu', function(e) {
+                    this.innerHTML = " " + (parseInt(this.innerHTML) - 1)
+                    var trafficLight = null
+                    for (var i in crossLights.children) {
+                        console.log(parseInt(label.innerHTML), crossLights.children[i].id)
+                        if (parseInt(label.innerHTML) == crossLights.children[i].id) {
+                            trafficLight = crossLights.children[i]
+                            crossLights.children[i].phaseTime1 -= 1
+
+                        }
+                    }
+                    
+
+                })
+
+                var currentGreenTime = document.createElement('span');
+                currentGreenTime.innerHTML = " " + phase2time + " ";
+                currentGreenTime.classList.add("text")
+
+                currentGreenTime.addEventListener('click', function(e) {
+                    this.innerHTML = " " + (parseInt(this.innerHTML) + 1)
+                    for (var i in crossLights.children) {
+                        console.log(parseInt(label.innerHTML), crossLights.children[i].id)
+                        if (parseInt(label.innerHTML) == crossLights.children[i].id) {
+                            trafficLight = crossLights.children[i]
+                           crossLights.children[i].phaseTime2 += 1
+
+                        }
+                    }
+                })
+                currentGreenTime.addEventListener('contextmenu', function(e) {
+                    this.innerHTML = " " + (parseInt(this.innerHTML) - 1)
+                    for (var i in crossLights.children) {
+                        console.log(parseInt(label.innerHTML), crossLights.children[i].id)
+                        if (parseInt(label.innerHTML) == crossLights.children[i].id) {
+                            trafficLight = crossLights.children[i]
+                            crossLights.children[i].phaseTime2 -= 1
+
+                        }
+                    }
+                })
+
+                div.append(label)
+                div.append(currentRedTime)
+                div.append(currentGreenTime)
+
+                tl.append(div)
+            }
+		</script>
+
+	</body>
+</html>
